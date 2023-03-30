@@ -1,0 +1,86 @@
+<?php
+
+namespace Aspera\Spreadsheet\XLSX\Tests;
+
+require_once __DIR__ . '/../vendor/autoload.php';
+
+use Exception;
+use PHPUnit\Framework\TestCase as PHPUnitTestCase;
+use Aspera\Spreadsheet\XLSX\Reader;
+
+/** Tests regarding basic worksheet handling functionality. */
+class SheetTest extends PHPUnitTestCase
+{
+    private const FILE_PATH = __DIR__ . '/input_files/multiple_sheets_test.xlsx';
+
+    /** @var Reader */
+    private $reader;
+
+    /**
+     * @throws Exception
+     */
+    public function setUp(): void
+    {
+        $this->reader = new Reader();
+        $this->reader->open(self::FILE_PATH);
+    }
+
+    public function tearDown(): void
+    {
+        $this->reader->close();
+    }
+
+    /**
+     * Checks if the reader is capable of reading the names of worksheets correctly.
+     */
+    public function testGetSheetsFunction(): void
+    {
+        $exp_sheets = array(
+            'First Sheet',
+            'Second Sheet',
+            'Third Sheet'
+        );
+        $sheet_name_list = array();
+        foreach ($this->reader->getSheets() as $worksheet) {
+            $sheet_name_list[] = $worksheet->getName();
+        }
+        self::assertSame($exp_sheets, $sheet_name_list, 'Sheet list differs');
+    }
+
+    /**
+     * Checks if changing the sheet works as expected and also if it handles faulty inputs correctly.
+     *
+     * @depends testGetSheetsFunction
+     *
+     * @throws  Exception
+     */
+    public function testChangeSheetFunction(): void
+    {
+        foreach ($this->reader->getSheets() as $index => $worksheet) {
+            $sheet_name_in_sheet_data = $worksheet->getName();
+            self::assertTrue(
+                $this->reader->changeSheet($index),
+                'Unable to switch to sheet [' . $index . '] => [' . $sheet_name_in_sheet_data . ']'
+            );
+
+            // For testing, the sheet name is written in each sheet's first cell of the first line
+            $content = $this->reader->current();
+            self::assertNotEmpty(
+                $content,
+                'No content found in sheet [' . $index . '] => [' . $sheet_name_in_sheet_data . ']'
+            );
+            $sheet_name_in_cell = $content[0];
+            self::assertSame(
+                $sheet_name_in_cell,
+                $sheet_name_in_sheet_data,
+                'Sheet has been changed to a wrong one'
+            );
+        }
+
+        // test index out of bounds
+        self::assertFalse(
+            $this->reader->changeSheet(-1),
+            'Error expected when stepping out of bounds'
+        );
+    }
+}
